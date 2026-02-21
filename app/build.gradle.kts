@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.calorieko.modeltestingapp"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -62,7 +62,6 @@ dependencies {
 
     // LiteRT (Newer version of TensorFlow Lite)
     implementation(libs.litert)
-    implementation(libs.litert.support)
 
     // CameraX (For live food identification later)
     implementation(libs.androidx.camera.camera2)
