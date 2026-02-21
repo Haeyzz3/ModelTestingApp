@@ -1,5 +1,6 @@
 package com.calorieko.modeltestingapp
 
+import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -24,17 +25,34 @@ import com.calorieko.modeltestingapp.ui.theme.ModelTestingAppTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize your classifier engine
         val classifier = CalorieKoClassifier(this)
 
         setContent {
             ModelTestingAppTheme {
+                var isLiveMode by remember { mutableStateOf(false) }
+                var hasCameraPermission by remember { mutableStateOf(false) }
+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { hasCameraPermission = it }
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    InferenceScreen(
-                        classifier = classifier,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    if (isLiveMode && hasCameraPermission) {
+                        LiveInferenceScreen(
+                            classifier = classifier,
+                            onBack = { isLiveMode = false },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        InferenceScreen(
+                            classifier = classifier,
+                            onOpenLive = {
+                                if (hasCameraPermission) isLiveMode = true
+                                else permissionLauncher.launch(Manifest.permission.CAMERA)
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
@@ -42,94 +60,111 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun InferenceScreen(classifier: CalorieKoClassifier, modifier: Modifier = Modifier) {
+fun InferenceScreen(
+    classifier: CalorieKoClassifier,
+    onOpenLive: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var results by remember { mutableStateOf<List<Pair<String, Float>>>(emptyList()) }
 
-    // Launcher to pick an image from the gallery
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        imageUri = uri
         uri?.let {
-            // Convert URI to Bitmap
             val source = ImageDecoder.createSource(context.contentResolver, it)
             bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
                 decoder.isMutableRequired = true
             }
-            // Run inference immediately after picking
-            bitmap?.let { b ->
-                results = classifier.classify(b)
-            }
+            bitmap?.let { b -> results = classifier.classify(b) }
         }
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+        modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "CalorieKo Inference Tester",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        Text("CalorieKo Inference Tester", style = MaterialTheme.typography.headlineMedium)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // Display the selected image
         bitmap?.let {
             Image(
                 bitmap = it.asImageBitmap(),
                 contentDescription = "Selected Dish",
-                modifier = Modifier
-                    .size(300.dp)
-                    .padding(8.dp)
+                modifier = Modifier.size(300.dp).padding(8.dp)
             )
         } ?: Text("No image selected")
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
         Button(onClick = { launcher.launch("image/*") }) {
             Text("Select Food Photo")
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // New Button for Live Mode
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onOpenLive) {
+            Text("Open Live Camera")
+        }
 
-        // Display Top 3 Results logic from test_model.py
-        if (results.isNotEmpty()) {
-            val topMatch = results[0]
-            val confidence = topMatch.second
+        Spacer(Modifier.height(24.dp))
 
-            Text(text = "TOP 3 CANDIDATES:", style = MaterialTheme.typography.titleMedium)
+        ResultDisplay(results)
+    }
+}
 
-            results.forEach { (name, score) ->
-                Text(
-                    text = "- ${name.lowercase()}: ${(score * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodyLarge
-                )
+@Composable
+fun LiveInferenceScreen(
+    classifier: CalorieKoClassifier,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var liveResults by remember { mutableStateOf<List<Pair<String, Float>>>(emptyList()) }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        CameraPreview(
+            modifier = Modifier.fillMaxSize(),
+            classifier = classifier,
+            onFrameAnalyzed = { liveResults = it }
+        )
+
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp)) {
+                    ResultDisplay(liveResults)
+                }
             }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // Final Decision Logic matching your Python script
-            if (confidence < 0.70f) {
-                Text(
-                    text = "RESULT: ⚠️ UNCERTAIN",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text("Action: Please retake with better lighting.")
-            } else {
-                Text(
-                    text = "RESULT: ✅ ${topMatch.first.uppercase()}",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+                Text("Close Camera")
             }
+        }
+    }
+}
+
+@Composable
+fun ResultDisplay(results: List<Pair<String, Float>>) {
+    if (results.isNotEmpty()) {
+        val topMatch = results[0]
+        val confidence = topMatch.second
+
+        Text("TOP 3 CANDIDATES:", style = MaterialTheme.typography.titleMedium)
+        results.forEach { (name, score) ->
+            Text("- ${name.lowercase()}: ${(score * 100).toInt()}%")
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        if (confidence < 0.70f) {
+            Text("RESULT: ⚠️ UNCERTAIN", color = MaterialTheme.colorScheme.error)
+            Text("Action: Better lighting required.")
+        } else {
+            Text("RESULT: ✅ ${topMatch.first.uppercase()}", color = MaterialTheme.colorScheme.primary)
         }
     }
 }
