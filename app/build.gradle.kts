@@ -37,6 +37,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    androidResources {
+        noCompress += "tflite" // Essential: prevents the build system from corrupting the model
+    }
 }
 
 dependencies {
@@ -55,4 +59,13 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // LiteRT (Newer version of TensorFlow Lite)
+    implementation(libs.litert)
+    implementation(libs.litert.support)
+
+    // CameraX (For live food identification later)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 }
