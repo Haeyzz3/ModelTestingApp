@@ -23,9 +23,11 @@ import androidx.compose.ui.unit.dp
 import com.calorieko.modeltestingapp.ui.theme.ModelTestingAppTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var classifier: CalorieKoClassifier
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val classifier = CalorieKoClassifier(this)
+        classifier = CalorieKoClassifier(this)
 
         setContent {
             ModelTestingAppTheme {
@@ -56,6 +58,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        classifier.close() // Releasing resources when app is closed
     }
 }
 
