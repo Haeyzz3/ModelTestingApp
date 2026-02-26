@@ -2,15 +2,11 @@ package com.calorieko.modeltestingapp
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,8 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.calorieko.modeltestingapp.ui.theme.ModelTestingAppTheme
@@ -61,7 +55,6 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         InferenceScreen(
-                            classifier = classifier,
                             onOpenLive = {
                                 if (hasCameraPermission) isLiveMode = true
                                 else permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -82,26 +75,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun InferenceScreen(
-    classifier: CalorieKoClassifier,
     onOpenLive: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var results by remember { mutableStateOf<List<Pair<String, Float>>>(emptyList()) }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val source = ImageDecoder.createSource(context.contentResolver, it)
-            bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                decoder.isMutableRequired = true
-            }
-            bitmap?.let { b -> results = classifier.classify(b) }
-        }
-    }
-
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -110,29 +86,9 @@ fun InferenceScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        bitmap?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = "Selected Dish",
-                modifier = Modifier.size(300.dp).padding(8.dp)
-            )
-        } ?: Text("No image selected")
-
-        Spacer(Modifier.height(16.dp))
-
-        Button(onClick = { launcher.launch("image/*") }) {
-            Text("Select Food Photo")
-        }
-
-        // New Button for Live Mode
-        Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onOpenLive) {
             Text("Open Live Camera")
         }
-
-        Spacer(Modifier.height(24.dp))
-
-        ResultDisplay(results)
     }
 }
 
