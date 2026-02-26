@@ -1,6 +1,7 @@
 package com.calorieko.modeltestingapp
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.calorieko.modeltestingapp.ui.theme.ModelTestingAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,11 +34,23 @@ class MainActivity : ComponentActivity() {
         setContent {
             ModelTestingAppTheme {
                 var isLiveMode by remember { mutableStateOf(false) }
-                var hasCameraPermission by remember { mutableStateOf(false) }
+                // Check if camera permission was already granted (e.g. from a previous session)
+                var hasCameraPermission by remember {
+                    mutableStateOf(
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+                    )
+                }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
-                ) { hasCameraPermission = it }
+                ) { granted ->
+                    hasCameraPermission = granted
+                    // Immediately open live camera after permission is granted
+                    if (granted) isLiveMode = true
+                }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     if (isLiveMode && hasCameraPermission) {
