@@ -8,8 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,8 +25,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ModelTestingAppTheme {
-                var isLiveMode by remember { mutableStateOf(false) }
-                // Check if camera permission was already granted (e.g. from a previous session)
                 var hasCameraPermission by remember {
                     mutableStateOf(
                         ContextCompat.checkSelfPermission(
@@ -42,25 +38,43 @@ class MainActivity : ComponentActivity() {
                     ActivityResultContracts.RequestPermission()
                 ) { granted ->
                     hasCameraPermission = granted
-                    // Immediately open live camera after permission is granted
-                    if (granted) isLiveMode = true
+                }
+
+                // Auto-request camera permission on first launch
+                LaunchedEffect(Unit) {
+                    if (!hasCameraPermission) {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    if (isLiveMode && hasCameraPermission) {
+                    if (hasCameraPermission) {
                         LiveInferenceScreen(
                             classifier = classifier,
-                            onBack = { isLiveMode = false },
+                            onBack = { finish() },
                             modifier = Modifier.padding(innerPadding)
                         )
                     } else {
-                        InferenceScreen(
-                            onOpenLive = {
-                                if (hasCameraPermission) isLiveMode = true
-                                else permissionLauncher.launch(Manifest.permission.CAMERA)
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
+                        // Fallback: shown if permission is denied
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                "Camera permission is required to use this app.",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = {
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            }) {
+                                Text("Grant Permission")
+                            }
+                        }
                     }
                 }
             }
@@ -69,26 +83,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        classifier.close() // Releasing resources when app is closed
-    }
-}
-
-@Composable
-fun InferenceScreen(
-    onOpenLive: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("CalorieKo Inference Tester", style = MaterialTheme.typography.headlineMedium)
-
-        Spacer(Modifier.height(16.dp))
-
-        OutlinedButton(onClick = onOpenLive) {
-            Text("Open Live Camera")
-        }
+        classifier.close()
     }
 }
 
