@@ -1,3 +1,4 @@
+chicken_adobo
 chicken_breast
 chicken_drumstick
 chicken_thigh
@@ -21,6 +22,10 @@ menudo
 milkfish_fried
 negative
 pinakbet
+pork_adobo
+rice_black
+rice_brown
+rice_corn
 rice_well_milled
 sinabawang_bangus
 sinigang_pork
