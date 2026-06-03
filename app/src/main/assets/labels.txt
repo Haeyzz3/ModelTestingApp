@@ -31,5 +31,4 @@ sinabawang_bangus
 sinigang_pork
 sinuglaw_pork
 tilapia_fried
-tinapa_ginisa
 udong
